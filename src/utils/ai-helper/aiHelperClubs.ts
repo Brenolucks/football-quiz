@@ -38,8 +38,8 @@ export async function aiHelperClubs(playerName: string): Promise<string[]> {
     let clubs: string[];
 
     try {
-        clubs = JSON.parse(responseChat);
-        if (!Array.isArray(clubs)) throw new Error();
+        const clubsParsed = JSON.parse(responseChat);
+        clubs = Array.isArray(clubsParsed) ? clubsParsed : [clubsParsed];
     } catch {
         clubs = responseChat.split(',').map(respC => respC.trim());
     }

@@ -9,7 +9,7 @@ const ClubSchema = new Schema<IClub>({
   },
   clubBadgeUrl: {
     type: String,
-    required: [true, 'Club URL is required'],
+    /*required: [true, 'Club URL is required'],*/
   }
 }, {
   timestamps: true // Adds createdAt and updatedAt automatically

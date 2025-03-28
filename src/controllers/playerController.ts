@@ -3,42 +3,59 @@ import Player from '../models/Player';
 import { readPlayerNamesFromJson } from '../utils/jsonReaderUtil';
 import { aiHelperClubs } from '../utils/ai-helper/aiHelperClubs';
 import pLimit from 'p-limit';
+import Club from '../models/Club';
 
 export const checkPlayers = async (req: Request, res: Response): Promise<void> => {
     console.log('📥 Entered checkPlayers route');
 
     try {
         const jsonPlayerNames = readPlayerNamesFromJson();
-        console.log('📄 Loaded players from JSON:', jsonPlayerNames.length);
 
         const existingPlayers = await Player.find({
             name: { $in: jsonPlayerNames },
         }).select('name clubs -_id').lean();
-
-        console.log('📦 Existing players in DB:', existingPlayers.length);
 
         const existingNames = existingPlayers.map(p => p.name);
         const missingPlayers = jsonPlayerNames.filter(name => !existingNames.includes(name));
         const playersWithClubs = existingPlayers.filter(p => Array.isArray(p.clubs) && p.clubs.length > 0);
         const playersWithoutClubs = existingPlayers.filter(p => !Array.isArray(p.clubs) || p.clubs.length === 0);
 
-        console.log('✅ Players with clubs:', playersWithClubs.length);
-        console.log('🚫 Players without clubs:', playersWithoutClubs.length);
-        console.log('❓ Missing in DB:', missingPlayers.length);
-
-        const result: { name: string; clubsFound: string[] }[] = [];
+        const result: { name: string; clubsFound: string[], clubs: string[] }[] = [];
 
         const limit = pLimit(5);
         const tasks = playersWithoutClubs.map(player =>
             limit(async () => {
                 try {
-                    console.log(`🤖 Asking AI for ${player.name}`);
                     const clubsFound = await aiHelperClubs(player.name);
-                    console.log(`✅ Got clubs for ${player.name}`);
-                    result.push({ name: player.name, clubsFound });
+
+                    const existingClubs = await Club.find({
+                        clubName: { $in: clubsFound }
+                    }).select("clubName clubBadgeUrl -_id").lean();
+
+                    const clubs = existingClubs.map(c => c.clubName);
+                    const clubsMissing = clubsFound.filter(clubName => !clubs.includes(clubName));
+
+                    if(clubsMissing.length > 0) {
+                        const newClubs = clubsMissing.map(clubName => ({
+                            clubName
+                        }));
+
+                        await Club.insertMany(newClubs);
+                    }
+
+                    // const operations = playersWithoutClubs.map(player => ({
+                    //     updateOne: {
+                    //         filter: { name: player.name },
+                    //         update: { $set: { clubs: clubsFound } },
+                    //         upsert: true
+                    //     }
+                    // }));
+
+                    // await Player.bulkWrite(operations);
+                    result.push({ name: player.name, clubsFound, clubs });
                 } catch (err) {
                     console.error(`❌ Error for ${player.name}:`, err);
-                    result.push({ name: player.name, clubsFound: [] });
+                    result.push({ name: player.name, clubsFound: [], clubs: [] });
                 }
             })
         );
