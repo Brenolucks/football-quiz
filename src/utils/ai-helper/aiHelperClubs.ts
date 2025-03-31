@@ -11,11 +11,15 @@ export async function aiHelperClubs(playerName: string): Promise<string[]> {
 
     if (cache[playerName]) return cache[playerName];
 
-    const prompt = `Give a JSON array of football clubs that ${playerName} has played for, in order. Just return the array.`;
+    const prompt = `Give a JSON array of football clubs that Mohamed Salah has played for, in order.
+                    For each club, return an object with:
+                    - "club": the name
+                    - "badgeUrl": the full Wikipedia media URL of the badge using this 
+                    format: https://en.wikipedia.org/wiki/{Wikipedia_Page_Title}#/media/File:{Image_File_Name}
+                    Only return the array in JSON format.`;
 
     console.log(prompt);
-    const ask = await withTimeout(
-        openai.chat.completions.create({
+    const ask = await openai.chat.completions.create({
         model: "openai/gpt-3.5-turbo",
         messages: [
             {
@@ -23,10 +27,9 @@ export async function aiHelperClubs(playerName: string): Promise<string[]> {
                 content: prompt
             }
         ],
+        max_tokens: 800, // ✅ reduce this value
         temperature: 0.3
-        }),
-        20000
-    );
+    });
 
     console.log(ask);
     const responseChat = ask.choices[0]?.message?.content ?? '';
@@ -34,7 +37,7 @@ export async function aiHelperClubs(playerName: string): Promise<string[]> {
         console.error('❌ No content received from GPT:', responseChat);
         return [];
     }
-    
+
     let clubs: string[];
 
     try {
